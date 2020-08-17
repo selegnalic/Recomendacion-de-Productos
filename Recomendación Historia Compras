@@ -37,7 +37,7 @@ RelacionProd=pd.DataFrame(columns=('Id_producto','Id_compra','Id_productoRel'))
 cont=0
 for d in range(len(dfProductos)):
     
-    ComprasxProd=df_ProductosCot[df_ProductosCot['id_producto']==dfProductos.loc[d,'id_producto']] # en df_ProductOrdd =28   dfProductos d=44
+    ComprasxProd=df_ProductosCot[df_ProductosCot['id_producto']==dfProductos.loc[d,'id_producto']] 
     ComprasxProd=ComprasxProd.reset_index()
     del ComprasxProd['index']
 
@@ -55,9 +55,9 @@ for d in range(len(dfProductos)):
         print(dfNumCompra)
 
         for j in range(len(dfNumCompra)):
-            if dfProductos.loc[d,'id_producto']!=dfNumCompra.loc[j,'id_producto']: # en   dfProductos d 44
+            if dfProductos.loc[d,'id_producto']!=dfNumCompra.loc[j,'id_producto']: 
                 print(dfNumCompra.loc[j,'id_producto'])
-                RelacionProd.loc[cont,'Id_producto']=dfProductos.loc[d,'id_producto'] # en dfProductos d 44
+                RelacionProd.loc[cont,'Id_producto']=dfProductos.loc[d,'id_producto'] 
                 RelacionProd.loc[cont,'Id_compra']=ComprasxProd.loc[i,'id']
                 RelacionProd.loc[cont,'Id_productoRel']=dfNumCompra.loc[j,'id_producto']
                 cont=cont+1
@@ -87,7 +87,7 @@ del dfProductos['index']
 ProductosRelacionPond=pd.DataFrame(columns=('Id_producto','Id_productoRel','Ponderacion'))
 cont=0
 for d in range(len(dfProductos)):
-    Producto=ProductosRelacion[ProductosRelacion['Id_producto']==dfProductos.loc[d,'Id_producto']] #d=51
+    Producto=ProductosRelacion[ProductosRelacion['Id_producto']==dfProductos.loc[d,'Id_producto']]
     Producto=Producto.sort_values('Cantidad', ascending=False)  #ordenar de mayor a menor
     Producto=Producto.reset_index()
     del Producto['index']
