@@ -1,0 +1,135 @@
+import pandas as pd
+import db_coneccion
+import json
+
+
+Conexion = db_coneccion.DbConeccion('localhost', 'root', 'rubi', 'sistema')
+queryproductos = Conexion.ejecutar("SELECT  id, id_usuario, productos FROM ventas_pedidos;")
+
+df_ProductosCot=pd.DataFrame(columns=('id_producto', 'nombre', 'modelo','precio','moneda',
+                                      'img','rowid','qty','descuento','tiempo','subtotal','interno',
+                                      'marca','existencia'))
+for d in range(len(queryproductos)):
+    if (queryproductos[d]['productos'].find('[{"') != -1):
+        productos=pd.read_json(queryproductos[d]['productos'], orient='columns')
+        productos['id']=queryproductos[d]['id']
+        productos['id_usuario']=queryproductos[d]['id_usuario']
+        df_ProductosCot=df_ProductosCot.append(productos, ignore_index = True)
+            
+df_ProductosCot=df_ProductosCot.loc[:,['id','id_producto']] # relacion de productos con el id  de la compra
+
+df_ProductOrd=df_ProductosCot.sort_values('id_producto')  #ordenar por producto 
+df_ProductOrd=df_ProductOrd.reset_index()
+del df_ProductOrd['index']
+
+dfCompras=df_ProductosCot.drop_duplicates(['id'], keep='last') #contiene diferentes id_compras (lista)
+dfCompras=dfCompras.loc[:,'id'].reset_index()
+del dfCompras['index']
+
+dfProductos=df_ProductosCot.drop_duplicates(['id_producto'], keep='last') #contiene diferentes productos (lista)
+dfProductos=dfProductos.loc[:,'id_producto'].reset_index()
+del dfProductos['index']
+
+
+RelacionProd=pd.DataFrame(columns=('Id_producto','Id_compra','Id_productoRel'))
+
+
+cont=0
+for d in range(len(dfProductos)):
+    
+    ComprasxProd=df_ProductosCot[df_ProductosCot['id_producto']==dfProductos.loc[d,'id_producto']] # en df_ProductOrdd =28   dfProductos d=44
+    ComprasxProd=ComprasxProd.reset_index()
+    del ComprasxProd['index']
+
+    print(ComprasxProd)
+    print('-----Producto------------')
+    print(dfProductos.loc[d,'id_producto']) 
+    
+    for i in range(len(ComprasxProd)): #para recorrer cada compra y buscar los productos asociados
+        print('-------------compras----------------')
+        print(ComprasxProd.loc[i,'id'])
+        dfNumCompra=df_ProductosCot[df_ProductosCot['id']==ComprasxProd.loc[i,'id']] #obtener el conjunto de productos que pertenecen al id de la compra i
+        dfNumCompra=dfNumCompra.reset_index()
+        del dfNumCompra['index']
+        print('-----------------------------')
+        print(dfNumCompra)
+
+        for j in range(len(dfNumCompra)):
+            if dfProductos.loc[d,'id_producto']!=dfNumCompra.loc[j,'id_producto']: # en   dfProductos d 44
+                print(dfNumCompra.loc[j,'id_producto'])
+                RelacionProd.loc[cont,'Id_producto']=dfProductos.loc[d,'id_producto'] # en dfProductos d 44
+                RelacionProd.loc[cont,'Id_compra']=ComprasxProd.loc[i,'id']
+                RelacionProd.loc[cont,'Id_productoRel']=dfNumCompra.loc[j,'id_producto']
+                cont=cont+1
+    
+print(RelacionProd)
+
+#ComprasxProd contiene todos los id de compras para el producto producto "i"
+#dfNumCompra contiene todos los productos para el id_compra "j"
+#df_ProductosCot contiene la relacion entre el id de compra y los productos
+
+#------------------------------------------------------------------------------------------
+ProductosRelacion=pd.DataFrame(columns=('Id_producto','Id_productoRel','Cantidad'))
+Clasificacion=RelacionProd.groupby(['Id_producto','Id_productoRel']).count().reset_index()
+print(Clasificacion)
+for i in range(len(Clasificacion)):
+    ProductosRelacion.loc[i,'Id_producto']=Clasificacion.loc[i,'Id_producto']
+    ProductosRelacion.loc[i,'Id_productoRel']=Clasificacion.loc[i,'Id_productoRel']
+    ProductosRelacion.loc[i,'Cantidad']=Clasificacion.loc[i,'Id_compra']
+
+print(ProductosRelacion)
+#------------------------ponderacion----------------------------------------------------------
+#se vuelve a hacer la lista de productos ya que muchos han sido eliminados
+dfProductos=ProductosRelacion.drop_duplicates(['Id_producto'], keep='last') #contiene diferentes productos (lista)
+dfProductos=dfProductos.loc[:,'Id_producto'].reset_index()
+del dfProductos['index']
+#print(dfProductos)
+ProductosRelacionPond=pd.DataFrame(columns=('Id_producto','Id_productoRel','Ponderacion'))
+cont=0
+for d in range(len(dfProductos)):
+    Producto=ProductosRelacion[ProductosRelacion['Id_producto']==dfProductos.loc[d,'Id_producto']] #d=51
+    Producto=Producto.sort_values('Cantidad', ascending=False)  #ordenar de mayor a menor
+    Producto=Producto.reset_index()
+    del Producto['index']
+    valor_max=max(Producto.loc[:,'Cantidad'])
+    
+    for i in range(len(Producto)):
+        ponderacion=float(Producto.loc[i,'Cantidad'])/float(valor_max)
+        print(ponderacion)
+        ProductosRelacionPond.loc[cont,'Id_producto']=Producto.loc[i,'Id_producto']
+        ProductosRelacionPond.loc[cont,'Id_productoRel']=Producto.loc[i,'Id_productoRel']
+        ProductosRelacionPond.loc[cont,'Ponderacion']=float(ponderacion)
+        cont=cont+1
+        
+print(ProductosRelacionPond)
+#------------------------------------insertar a una estructura json--------------
+dfProductos=ProductosRelacionPond.drop_duplicates(['Id_producto'], keep='last') #contiene diferentes productos (lista)
+dfProductos=dfProductos.loc[:,'Id_producto'].reset_index()
+del dfProductos['index']
+
+ProductosRelacion=pd.DataFrame(columns=('Id_producto','Id_productoRel'))
+Id_productoRel=[]
+cont=0
+for i in range(len(dfProductos)):
+    Producto=ProductosRelacionPond[ProductosRelacionPond['Id_producto']==dfProductos.loc[i,'Id_producto']] #d=51
+    Producto=Producto.reset_index()
+    del Producto['index']
+    Id_productoRel=[]
+    for j in range(len(Producto)):
+        Id_productoRel.append(str(Producto.loc[j,'Id_productoRel']))
+
+    json_format = json.dumps(Id_productoRel)
+    ProductosRelacion.loc[cont,'Id_producto'] = dfProductos.loc[i,'Id_producto']
+    ProductosRelacion.loc[cont,'Id_productoRel'] =json_format
+    cont=cont+1
+
+print(ProductosRelacion)
+#-----------------------insertar a la base------------------------------------------------------
+for i in range(len(ProductosRelacion)):
+    datos = {
+        'id_producto': int(ProductosRelacion.loc[i,'Id_producto']),
+        'id_productos':ProductosRelacion.loc[i,'Id_productoRel']
+        }
+    DbGuardarRegistro = db_coneccion.DbConeccion('localhost', 'root', 'rubi', 'sistema')
+    DbGuardarRegistro.insertar("Productos_Relacion", datos)
+    print(datos)
